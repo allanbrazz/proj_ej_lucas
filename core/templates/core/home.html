@@ -3,173 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Solar - Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <title>Monitor Solar - Dashboard Web</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f4f6f9;
-            color: #1f2937;
-        }
-        .container {
-            max-width: 1520px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-        .header { margin-bottom: 24px; }
-        .header h1 { margin: 0 0 8px 0; }
-        .header p { margin: 0; color: #6b7280; }
-        .layout {
-            display: grid;
-            grid-template-columns: 340px 1fr;
-            gap: 24px;
-            align-items: start;
-        }
-        .card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.06);
-            margin-bottom: 24px;
-        }
+        body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
+        .header { margin-bottom: 20px; }
+        .header h1 { margin: 0 0 8px; font-size: 30px; }
+        .header p { margin: 0; color: #64748b; }
+        .layout { display: grid; grid-template-columns: 360px 1fr; gap: 20px; align-items: start; }
+        .card { background: #fff; border-radius: 18px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); padding: 20px; margin-bottom: 20px; }
+        .card h2, .card h3 { margin-top: 0; }
         .field { margin-bottom: 14px; }
-        .field label {
-            display: block;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-        .field input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; }
-        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
-        .btn {
-            display: inline-block;
-            padding: 11px 16px;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            font-weight: 700;
-        }
+        .field label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; color: #334155; }
+        .field input, .field select, .field textarea { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #cbd5e1; background: #fff; font-size: 14px; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .btn { display: inline-block; border: none; border-radius: 12px; padding: 10px 16px; font-weight: 700; cursor: pointer; text-decoration: none; }
         .btn-primary { background: #2563eb; color: #fff; }
         .btn-success { background: #059669; color: #fff; }
-        .btn-secondary { background: #e5e7eb; color: #111827; }
+        .btn-secondary { background: #e2e8f0; color: #0f172a; }
+        .btn-ghost { background: #fff; color: #0f172a; border: 1px solid #cbd5e1; }
         .history-list { list-style: none; padding: 0; margin: 0; }
-        .history-list li { border-bottom: 1px solid #e5e7eb; padding: 12px 0; }
+        .history-list li { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
         .history-list li:last-child { border-bottom: none; }
         .history-list a { text-decoration: none; color: #2563eb; font-weight: 700; }
-        .muted { color: #6b7280; }
-        .badge {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            margin-left: 8px;
-        }
+        .muted { color: #64748b; }
+        .small { font-size: 12px; }
+        .badge { display: inline-block; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-left: 8px; }
         .badge-pending { background: #fef3c7; color: #92400e; }
         .badge-success { background: #dcfce7; color: #166534; }
         .badge-error { background: #fee2e2; color: #991b1b; }
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(150px, 1fr));
-            gap: 12px;
-            margin: 16px 0;
-        }
-        .info-box {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 14px;
-        }
-        .info-box .label { display:block; font-size:12px; color:#6b7280; margin-bottom:6px; text-transform: uppercase; }
-        .info-box .value { font-weight: 700; font-size: 18px; word-break: break-word; }
-        .dashboard-kpis {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(140px, 1fr));
-            gap: 12px;
-            margin: 16px 0 24px;
-        }
-        .kpi-card {
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px;
-        }
-        .kpi-card .title { font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 6px; }
-        .kpi-card .number { font-size: 24px; font-weight: 700; }
-        .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px; }
-        .tab-btn {
-            background: #e5e7eb;
-            color: #111827;
-            border: none;
-            border-radius: 999px;
-            padding: 10px 14px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .tab-btn.active { background: #2563eb; color: #fff; }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
-        .chart-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 16px; }
-        .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 16px; }
-        .chart-card {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 16px;
-            min-height: 320px;
-        }
+        .summary-grid, .kpi-grid, .relay-grid, .detail-grid { display: grid; gap: 12px; }
+        .summary-grid { grid-template-columns: repeat(4, minmax(150px, 1fr)); margin-top: 16px; }
+        .kpi-grid { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
+        .relay-grid { grid-template-columns: repeat(4, minmax(140px, 1fr)); }
+        .detail-grid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+        .info-box, .kpi-card, .relay-card { border-radius: 16px; border: 1px solid #e2e8f0; padding: 14px; background: #f8fafc; }
+        .info-box .label, .kpi-card .label { display: block; font-size: 12px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+        .info-box .value, .kpi-card .value { font-size: 20px; font-weight: 700; word-break: break-word; }
+        .relay-card.on { background: #ecfdf5; border-color: #86efac; }
+        .relay-card.off { background: #fff1f2; border-color: #fda4af; }
+        .relay-card .name { font-size: 12px; color: #475569; text-transform: uppercase; }
+        .relay-card .state { font-size: 20px; font-weight: 700; margin: 6px 0; }
+        .tab-nav { display: flex; gap: 10px; margin-bottom: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
+        .tab-link { border: none; border-radius: 999px; padding: 10px 16px; background: #e2e8f0; color: #0f172a; font-weight: 700; cursor: pointer; }
+        .tab-link.active { background: #0f172a; color: #fff; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .toolbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .chart-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 16px; margin-top: 16px; }
+        .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+        .chart-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; }
         .chart-card h3 { margin: 0 0 10px; font-size: 16px; }
-        .chart-wrap { position: relative; height: 250px; }
-        .chart-wrap.tall { height: 300px; }
-        .relay-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(140px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .relay-card {
-            border-radius: 12px;
-            padding: 14px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-        }
-        .relay-card.on { background: #dcfce7; border-color: #86efac; }
-        .relay-card.off { background: #fee2e2; border-color: #fca5a5; }
-        .relay-card .name { font-size: 12px; color: #374151; text-transform: uppercase; }
-        .relay-card .state { font-weight: 700; font-size: 20px; margin: 6px 0; }
-        .relay-card .time { color: #6b7280; font-size: 13px; }
-        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        pre {
-            background: #111827;
-            color: #f9fafb;
-            padding: 16px;
-            border-radius: 12px;
-            overflow-x: auto;
-            font-size: 13px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-        }
-        details summary { cursor: pointer; font-weight: 700; margin-bottom: 10px; }
-        .error-box {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-            border-radius: 12px;
-            padding: 14px;
-            margin-top: 12px;
-        }
-        @media (max-width: 1100px) {
-            .layout, .chart-grid-2, .info-grid, .dashboard-kpis, .relay-grid, .details-grid { grid-template-columns: 1fr; }
+        .chart-wrap { position: relative; height: 290px; }
+        .chart-wrap.tall { height: 340px; }
+        .status-bar { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #dbeafe; background: #eff6ff; border-radius: 14px; }
+        .filter-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 12px; margin-bottom: 10px; }
+        .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; font-size: 13px; text-align: left; white-space: nowrap; }
+        th { background: #f8fafc; position: sticky; top: 0; }
+        .preview-box { margin-top: 16px; }
+        .empty-box, .error-box { border-radius: 14px; padding: 14px; }
+        .empty-box { background: #f8fafc; color: #64748b; border: 1px dashed #cbd5e1; }
+        .error-box { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        pre { background: #0f172a; color: #e2e8f0; border-radius: 14px; padding: 14px; overflow-x: auto; font-size: 12px; }
+        @media (max-width: 1200px) {
+            .layout, .summary-grid, .kpi-grid, .relay-grid, .detail-grid, .chart-grid-2, .filter-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>Monitor Solar - Dashboard legado em Django</h1>
-        <p>Os dados vêm do FTP legado e agora são apresentados em um painel web com os gráficos do monitor diário, histórico de 3 dias e balanço energético.</p>
+        <h1>Monitor Solar - Dashboard web</h1>
+        <p>Separado em duas abas: histórico navegável com filtro e extração, e monitor do dia atual com atualização automática a cada 5 minutos.</p>
     </div>
 
     <div class="layout">
@@ -209,7 +118,7 @@
                     <ul class="history-list">
                         {% for item in ultimas_execucoes %}
                             <li>
-                                <a href="{% url 'execucao_detalhe' item.pk %}">{{ item.nome }}</a>
+                                <a href="{% url 'execucao_detalhe' item.pk %}?tab={{ active_tab|default:'historico' }}">{{ item.nome }}</a>
                                 {% if item.status == 'pending' %}
                                     <span class="badge badge-pending">Pendente</span>
                                 {% elif item.status == 'success' %}
@@ -217,243 +126,406 @@
                                 {% else %}
                                     <span class="badge badge-error">Erro</span>
                                 {% endif %}
-                                <div class="muted">{{ item.criado_em|date:"d/m/Y H:i:s" }} | {{ item.origem }}</div>
+                                <div class="muted small">{{ item.criado_em|date:"d/m/Y H:i:s" }} | {{ item.origem }}</div>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="muted">Nenhuma execução cadastrada.</p>
+                    <div class="empty-box">Nenhuma execução cadastrada.</div>
                 {% endif %}
             </div>
         </div>
 
         <div>
             <div class="card">
-                <h2>Execução selecionada</h2>
-                {% if execucao_selecionada %}
-                    <div class="actions">
-                        <form method="post" action="{% url 'sincronizar_novamente' execucao_selecionada.pk %}">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-success">Refresh</button>
-                        </form>
-                        <a class="btn btn-secondary" href="{% url 'execucao_api' execucao_selecionada.pk %}" target="_blank">Ver JSON</a>
+                <div class="toolbar">
+                    <div>
+                        <h2 style="margin:0;">Execução selecionada</h2>
+                        {% if execucao_selecionada %}
+                            <div class="muted">{{ execucao_selecionada.nome }} | {{ execucao_selecionada.criado_em|date:"d/m/Y H:i:s" }}</div>
+                        {% endif %}
                     </div>
+                    <div class="tab-nav">
+                        <button class="tab-link" data-tab="historico">Dashboard histórico</button>
+                        <button class="tab-link" data-tab="tempo-real">Dia atual em tempo real</button>
+                    </div>
+                    {% if execucao_selecionada %}
+                </div>
 
-                    <div class="info-grid">
+                {% if execucao_selecionada %}
+                    <div class="summary-grid">
                         <div class="info-box"><span class="label">ID</span><span class="value">{{ execucao_selecionada.pk }}</span></div>
                         <div class="info-box"><span class="label">Status</span><span class="value">{{ execucao_selecionada.get_status_display }}</span></div>
-                        <div class="info-box"><span class="label">Origem</span><span class="value">{{ execucao_selecionada.origem }}</span></div>
                         <div class="info-box"><span class="label">Linhas</span><span class="value">{{ execucao_selecionada.total_linhas }}</span></div>
                         <div class="info-box"><span class="label">Colunas</span><span class="value">{{ execucao_selecionada.total_colunas }}</span></div>
-                        <div class="info-box"><span class="label">Criado em</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.criado_em|date:"d/m/Y H:i:s" }}</span></div>
-                        <div class="info-box"><span class="label">Atualizado em</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.atualizado_em|date:"d/m/Y H:i:s" }}</span></div>
-                        <div class="info-box"><span class="label">Última janela</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.resumo.janela_temporal.inicio|default:"-" }}</span></div>
                     </div>
 
                     {% if execucao_selecionada.erro %}
                         <div class="error-box">{{ execucao_selecionada.erro }}</div>
                     {% endif %}
-
-                    {% if dashboard_data %}
-                        <div class="dashboard-kpis">
-                            <div class="kpi-card">
-                                <div class="title">Energia útil hoje</div>
-                                <div class="number">{{ dashboard_data.kpis.energia_colector_kwh_hoje|default:0 }}</div>
-                                <div class="muted">kWh</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="title">GHI máximo hoje</div>
-                                <div class="number">{{ dashboard_data.kpis.ghi_max_hoje|default:"-" }}</div>
-                                <div class="muted">W/m²</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="title">Caudal máximo</div>
-                                <div class="number">{{ dashboard_data.kpis.caudal_max_hoje|default:"-" }}</div>
-                                <div class="muted">L/min</div>
-                            </div>
-                            <div class="kpi-card">
-                                <div class="title">Última atualização</div>
-                                <div class="number" style="font-size:16px;">{{ dashboard_data.kpis.ultima_atualizacao|default:"-" }}</div>
-                                <div class="muted">timestamp</div>
-                            </div>
-                        </div>
-
-                        <div class="relay-grid">
-                            {% for relay in dashboard_data.relay_cards %}
-                                <div class="relay-card {% if relay.state == 'ON' %}on{% else %}off{% endif %}">
-                                    <div class="name">{{ relay.name }}</div>
-                                    <div class="state">{{ relay.state }}</div>
-                                    <div class="time">Tempo: {{ relay.duration }}</div>
-                                </div>
-                            {% endfor %}
-                        </div>
-
-                        <div class="tabs">
-                            <button class="tab-btn active" data-tab="tab-monitor">Monitor do dia</button>
-                            <button class="tab-btn" data-tab="tab-historico">Histórico 3 dias</button>
-                            <button class="tab-btn" data-tab="tab-energia">Balanço energético</button>
-                        </div>
-
-                        <div id="tab-monitor" class="tab-panel active">
-                            <div class="chart-grid-2">
-                                <div class="chart-card"><h3>Temperaturas (T1, T2, T3, T6)</h3><div class="chart-wrap"><canvas id="chart-current-left"></canvas></div></div>
-                                <div class="chart-card"><h3>Temperaturas (T4, T5, T7, T8)</h3><div class="chart-wrap"><canvas id="chart-current-right"></canvas></div></div>
-                                <div class="chart-card"><h3>Humedad</h3><div class="chart-wrap"><canvas id="chart-current-hum"></canvas></div></div>
-                                <div class="chart-card"><h3>Caudal</h3><div class="chart-wrap"><canvas id="chart-current-flow"></canvas></div></div>
-                                <div class="chart-card" style="grid-column: 1 / -1;"><h3>Actuadores</h3><div class="chart-wrap"><canvas id="chart-current-relays"></canvas></div></div>
-                            </div>
-                        </div>
-
-                        <div id="tab-historico" class="tab-panel">
-                            <div class="chart-grid-1">
-                                <div class="chart-card"><h3>Temperaturas - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-temp"></canvas></div></div>
-                                <div class="chart-card"><h3>Humedad - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-hum"></canvas></div></div>
-                                <div class="chart-card"><h3>Caudal - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-flow"></canvas></div></div>
-                                <div class="chart-card"><h3>Actuadores - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-relays"></canvas></div></div>
-                            </div>
-                        </div>
-
-                        <div id="tab-energia" class="tab-panel">
-                            <div class="chart-grid-1">
-                                <div class="chart-card">
-                                    <h3>Potências térmicas</h3>
-                                    <div class="chart-wrap tall"><canvas id="chart-energy"></canvas></div>
-                                </div>
-                            </div>
-                        </div>
-                    {% else %}
-                        <p class="muted">Esta execução ainda não possui payload de dashboard.</p>
+                    <div class="actions">
+                        <form method="post" action="{% url 'sincronizar_novamente' execucao_selecionada.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="tab" id="refreshTabInput" value="{{ active_tab|default:'historico' }}">
+                            <button type="submit" class="btn btn-success">Refresh desta execução</button>
+                        </form>
+                        <a class="btn btn-secondary" href="{% url 'execucao_api' execucao_selecionada.pk %}" target="_blank">Ver JSON da execução</a>
+                    </div>
                     {% endif %}
-
-                    <div class="details-grid" style="margin-top:24px;">
-                        <div>
-                            <details>
-                                <summary>Parâmetros da execução</summary>
-                                <pre>{{ execucao_selecionada.parametros_busca }}</pre>
-                            </details>
+                    <div id="tab-historico" class="tab-pane">
+                        <div class="status-bar">
+                            <div>
+                                <strong>Histórico navegável</strong>
+                                <div class="muted small">Filtre a janela temporal, reprocesse os gráficos e extraia o dataset em CSV.</div>
+                            </div>
+                            <div class="small muted" id="historicoMetaText">Carregando metadados...</div>
                         </div>
-                        <div>
-                            <details>
-                                <summary>Colunas identificadas</summary>
-                                <pre>{{ execucao_selecionada.colunas }}</pre>
-                            </details>
+
+                        <div class="filter-grid">
+                            <div class="field">
+                                <label for="historicoStart">Início</label>
+                                <input type="datetime-local" id="historicoStart">
+                            </div>
+                            <div class="field">
+                                <label for="historicoEnd">Fim</label>
+                                <input type="datetime-local" id="historicoEnd">
+                            </div>
+                            <div class="field">
+                                <label for="historicoFreq">Reamostragem</label>
+                                <select id="historicoFreq">
+                                    <option value="1min">1 min</option>
+                                    <option value="5min" selected>5 min</option>
+                                    <option value="15min">15 min</option>
+                                    <option value="30min">30 min</option>
+                                    <option value="1h">1 h</option>
+                                </select>
+                            </div>
+                            <div class="field" style="display:flex;align-items:flex-end;">
+                                <div class="actions">
+                                    <button type="button" class="btn btn-primary" id="btnAplicarHistorico">Aplicar filtros</button>
+                                    <button type="button" class="btn btn-ghost" id="btnLimparHistorico">Limpar</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="actions" style="margin-bottom:16px;">
+                            <a class="btn btn-secondary" id="btnExportCsv" href="{% url 'exportar_execucao_csv' execucao_selecionada.pk %}">Exportar CSV filtrado</a>
+                            <a class="btn btn-secondary" id="btnExportJson" href="{% url 'execucao_historico_api' execucao_selecionada.pk %}" target="_blank">Exportar JSON filtrado</a>
+                        </div>
+
+                        <div class="detail-grid" id="historicoCards"></div>
+                        <div class="relay-grid" id="historicoRelayCards" style="margin-top:16px;"></div>
+
+                        <div class="chart-grid-2">
+                            <div class="chart-card"><h3>Temperaturas históricas</h3><div class="chart-wrap"><canvas id="histTemperatureChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Humedad histórica</h3><div class="chart-wrap"><canvas id="histHumidityChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Caudal histórico</h3><div class="chart-wrap"><canvas id="histFlowChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Histórico de relés</h3><div class="chart-wrap"><canvas id="histRelayChart"></canvas></div></div>
+                        </div>
+                        <div class="chart-grid-1">
+                            <div class="chart-card"><h3>Balanço energético na janela filtrada</h3><div class="chart-wrap tall"><canvas id="histEnergyChart"></canvas></div></div>
+                        </div>
+
+                        <div class="preview-box">
+                            <h3>Prévia dos dados filtrados</h3>
+                            <div class="table-wrap">
+                                <table>
+                                    <thead id="historicoPreviewHead"></thead>
+                                    <tbody id="historicoPreviewBody"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
-                    <details style="margin-top:16px;">
-                        <summary>Resumo bruto</summary>
-                        <pre>{{ execucao_selecionada.resumo }}</pre>
+                    <div id="tab-tempo-real" class="tab-pane">
+                        <div class="status-bar">
+                            <div>
+                                <strong>Monitor do dia atual</strong>
+                                <div class="muted small">Atualização automática a cada 5 minutos. Você também pode atualizar manualmente.</div>
+                            </div>
+                            <div class="actions">
+                                <span class="small muted" id="tempoRealStatus">Última atualização: carregando...</span>
+                                <button type="button" class="btn btn-primary" id="btnAtualizarTempoReal">Atualizar agora</button>
+                            </div>
+                        </div>
+
+                        <div class="kpi-grid" id="tempoRealKpis"></div>
+                        <div class="relay-grid" id="tempoRealRelayCards" style="margin-top:16px;"></div>
+
+                        <div class="chart-grid-2">
+                            <div class="chart-card"><h3>Temperaturas - grupo esquerdo</h3><div class="chart-wrap"><canvas id="rtLeftTempChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Temperaturas - grupo direito</h3><div class="chart-wrap"><canvas id="rtRightTempChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Humedad</h3><div class="chart-wrap"><canvas id="rtHumidityChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Caudal</h3><div class="chart-wrap"><canvas id="rtFlowChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Relés do dia atual</h3><div class="chart-wrap"><canvas id="rtRelayChart"></canvas></div></div>
+                            <div class="chart-card"><h3>Balanço energético do dia atual</h3><div class="chart-wrap"><canvas id="rtEnergyChart"></canvas></div></div>
+                        </div>
+                    </div>
+
+                    <details style="margin-top:20px;">
+                        <summary>Resumo bruto da execução</summary>
+                        <pre>{{ execucao_selecionada.resumo|default:"{}" }}</pre>
                     </details>
                 {% else %}
-                    <p class="muted">Nenhuma execução disponível.</p>
+                    <div class="empty-box">Selecione uma execução à esquerda ou faça uma nova sincronização.</div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-{% if dashboard_data %}
+{% if execucao_selecionada %}
     {{ dashboard_data|json_script:"dashboard-data" }}
+    {{ execucao_selecionada.pk|json_script:"execution-id" }}
+    {{ active_tab|json_script:"active-tab" }}
 {% endif %}
 
 <script>
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach((item) => item.classList.remove('active'));
-            document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).classList.add('active');
-        });
+(() => {
+    const executionNode = document.getElementById('execution-id');
+    if (!executionNode) return;
+
+    const executionId = JSON.parse(executionNode.textContent);
+    const initialDashboard = JSON.parse(document.getElementById('dashboard-data').textContent || '{}');
+    const initialActiveTab = JSON.parse(document.getElementById('active-tab').textContent || '"historico"');
+    const charts = {};
+    const refreshTabInput = document.getElementById('refreshTabInput');
+
+    const COLORS = {
+        T1: '#ff0000', T2: '#ffd700', T3: '#ff8c00', T4: '#dc143c', T5: '#00008b',
+        T6: '#2e8b57', T7: '#ff8c00', T8: '#8a2be2', H1: '#6d28d9', H2: '#c026d3',
+        Caudal: '#16a34a', R1: '#ff00ff', R2: '#32cd32', R3: '#d97706', R4: '#0f766e',
+        Q_COLECTOR: '#ff4500', Q_AERO_W: '#1e90ff', Q_T1_T5: '#ff1493', Q_AERO_A: '#32cd32',
+        GHI: '#d4af37', default: '#475569'
+    };
+
+    function colorFor(name) {
+        return COLORS[name] || COLORS.default;
+    }
+
+    function steppedForSeries(name) {
+        return ['R1', 'R2', 'R3', 'R4'].includes(name);
+    }
+
+    function chartOptions(overrides = {}) {
+        return Object.assign({
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'top' } },
+            scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: false } }
+        }, overrides);
+    }
+
+    function buildDatasets(seriesObj) {
+        return Object.entries(seriesObj || {}).map(([name, values]) => ({
+            label: name,
+            data: values,
+            borderColor: colorFor(name),
+            backgroundColor: colorFor(name),
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.18,
+            stepped: steppedForSeries(name),
+            fill: false,
+        }));
+    }
+
+    function upsertChart(key, canvasId, payload, opts = {}) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const data = payload || { labels: [], series: {} };
+        const config = {
+            type: 'line',
+            data: { labels: data.labels || [], datasets: buildDatasets(data.series || {}) },
+            options: chartOptions(opts),
+        };
+        if (charts[key]) {
+            charts[key].data = config.data;
+            charts[key].options = config.options;
+            charts[key].update();
+        } else {
+            charts[key] = new Chart(canvas.getContext('2d'), config);
+        }
+    }
+
+    function formatNumber(value, digits = 2) {
+        if (value === null || value === undefined || value === '') return '-';
+        const n = Number(value);
+        if (Number.isNaN(n)) return value;
+        return n.toFixed(digits);
+    }
+
+    function renderCards(containerId, obj, digits = 2) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const entries = Object.entries(obj || {});
+        if (!entries.length) {
+            container.innerHTML = '<div class="empty-box">Sem indicadores para exibir.</div>';
+            return;
+        }
+        container.innerHTML = entries.map(([label, value]) => `
+            <div class="info-box">
+                <span class="label">${label}</span>
+                <span class="value">${typeof value === 'number' ? formatNumber(value, digits) : (value || '-')}</span>
+            </div>
+        `).join('');
+    }
+
+    function renderKpisRealtime(kpis = {}) {
+        const target = document.getElementById('tempoRealKpis');
+        if (!target) return;
+        target.innerHTML = `
+            <div class="kpi-card"><span class="label">Energia útil hoje [kWh]</span><span class="value">${formatNumber(kpis.energia_colector_kwh_hoje, 4)}</span></div>
+            <div class="kpi-card"><span class="label">GHI máx. hoje</span><span class="value">${formatNumber(kpis.ghi_max_hoje, 2)}</span></div>
+            <div class="kpi-card"><span class="label">Caudal máx. hoje</span><span class="value">${formatNumber(kpis.caudal_max_hoje, 2)}</span></div>
+            <div class="kpi-card"><span class="label">Última atualização</span><span class="value" style="font-size:15px;">${kpis.ultima_atualizacao || '-'}</span></div>
+        `;
+    }
+
+    function renderRelayCards(containerId, cards = []) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!cards.length) {
+            container.innerHTML = '<div class="empty-box">Sem estado de relés disponível.</div>';
+            return;
+        }
+        container.innerHTML = cards.map(card => `
+            <div class="relay-card ${card.state === 'ON' ? 'on' : 'off'}">
+                <div class="name">${card.name}</div>
+                <div class="state">${card.state}</div>
+                <div class="muted small">Duração: ${card.duration || '-'}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderPreview(preview = []) {
+        const head = document.getElementById('historicoPreviewHead');
+        const body = document.getElementById('historicoPreviewBody');
+        if (!head || !body) return;
+        if (!preview.length) {
+            head.innerHTML = '';
+            body.innerHTML = '<tr><td class="muted">Sem registros para a janela selecionada.</td></tr>';
+            return;
+        }
+        const cols = Object.keys(preview[0]);
+        head.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+        body.innerHTML = preview.slice(-20).reverse().map(row => `
+            <tr>${cols.map(c => `<td>${row[c] ?? '-'}</td>`).join('')}</tr>
+        `).join('');
+    }
+
+    function renderHistorical(payload) {
+        const chartsPayload = payload.charts || {};
+        upsertChart('histTemperature', 'histTemperatureChart', chartsPayload.temperature);
+        upsertChart('histHumidity', 'histHumidityChart', chartsPayload.humidity);
+        upsertChart('histFlow', 'histFlowChart', chartsPayload.flow, { scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } });
+        upsertChart('histRelays', 'histRelayChart', chartsPayload.relays, { scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true, min: 0, max: 1 } } });
+        upsertChart('histEnergy', 'histEnergyChart', chartsPayload.energy, { scales: { x: { ticks: { maxTicksLimit: 16 } }, y: { beginAtZero: true } } });
+        renderCards('historicoCards', payload.latest_cards || {});
+        renderRelayCards('historicoRelayCards', payload.relay_cards || []);
+        renderPreview(payload.preview || []);
+        const metaText = document.getElementById('historicoMetaText');
+        if (metaText) {
+            const meta = payload.meta || {};
+            metaText.textContent = `Janela: ${meta.janela || '-'} | Registros: ${meta.n_registros ?? 0} | Freq.: ${meta.freq || '-'}`;
+        }
+    }
+
+    function renderRealtime(dashboard) {
+        const current = dashboard.current_day || {};
+        upsertChart('rtLeftTemp', 'rtLeftTempChart', current.left_temp);
+        upsertChart('rtRightTemp', 'rtRightTempChart', current.right_temp);
+        upsertChart('rtHumidity', 'rtHumidityChart', current.humidity);
+        upsertChart('rtFlow', 'rtFlowChart', current.flow, { scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } });
+        upsertChart('rtRelays', 'rtRelayChart', current.relays, { scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true, min: 0, max: 1 } } });
+        upsertChart('rtEnergy', 'rtEnergyChart', (dashboard.energy_balance || {}).power, { scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } });
+        renderKpisRealtime(dashboard.kpis || {});
+        renderRelayCards('tempoRealRelayCards', dashboard.relay_cards || []);
+        const status = document.getElementById('tempoRealStatus');
+        if (status) {
+            status.textContent = `Última atualização: ${(dashboard.kpis || {}).ultima_atualizacao || '-'}`;
+        }
+    }
+
+    function setActiveTab(name) {
+        document.querySelectorAll('.tab-link').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.toggle('active', pane.id === `tab-${name}`));
+        if (refreshTabInput) refreshTabInput.value = name;
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', name);
+        window.history.replaceState({}, '', url.toString());
+    }
+
+    document.querySelectorAll('.tab-link').forEach(btn => {
+        btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
 
-    const dashboardScript = document.getElementById('dashboard-data');
-    if (dashboardScript) {
-        const dashboard = JSON.parse(dashboardScript.textContent);
-        const charts = [];
+    async function loadHistorical() {
+        const start = document.getElementById('historicoStart').value;
+        const end = document.getElementById('historicoEnd').value;
+        const freq = document.getElementById('historicoFreq').value;
+        const url = new URL(`/api/execucao/${executionId}/historico/`, window.location.origin);
+        if (start) url.searchParams.set('start', start);
+        if (end) url.searchParams.set('end', end);
+        if (freq) url.searchParams.set('freq', freq);
+        const res = await fetch(url);
+        const data = await res.json();
+        renderHistorical(data);
 
-        const COLORS = {
-            T1: '#FF0000', T2: '#FFD700', T3: '#FF8C00', T4: '#DC143C', T5: '#00008B', T6: '#2E8B57', T7: '#FF8C00', T8: '#8A2BE2',
-            H1: '#9400D3', H2: '#DA70D6', Caudal: '#2E7D32', GHI: '#D4AF37',
-            R1: '#FF00FF', R2: '#32CD32', R3: '#D2691E', R4: '#008080',
-            Q_COLECTOR: '#FF4500', Q_T1_T5: '#FF1493', Q_AERO_W: '#1E90FF', Q_AERO_A: '#32CD32'
-        };
-
-        function datasetColor(name) {
-            return COLORS[name] || '#4B5563';
-        }
-
-        function buildDatasets(seriesMap, options = {}) {
-            return Object.entries(seriesMap || {}).map(([name, values]) => {
-                const isRelay = name.startsWith('R');
-                const isFlow = name === 'Caudal';
-                const isPower = ['Q_COLECTOR', 'Q_T1_T5', 'Q_AERO_W', 'Q_AERO_A'].includes(name);
-                return {
-                    label: name,
-                    data: values,
-                    borderColor: datasetColor(name),
-                    backgroundColor: options.fill || isFlow ? datasetColor(name) + '33' : datasetColor(name),
-                    fill: Boolean(options.fill || isFlow),
-                    tension: isRelay ? 0 : 0.2,
-                    stepped: isRelay,
-                    pointRadius: 0,
-                    borderWidth: isPower ? 2 : 1.4,
-                    yAxisID: (options.secondarySeries || []).includes(name) ? 'y1' : 'y',
-                };
-            });
-        }
-
-        function createLineChart(canvasId, payload, chartOptions = {}) {
-            const el = document.getElementById(canvasId);
-            if (!el || !payload || !payload.labels || !payload.labels.length) return;
-            const config = {
-                type: 'line',
-                data: {
-                    labels: payload.labels,
-                    datasets: buildDatasets(payload.series, chartOptions),
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'top' } },
-                    scales: {
-                        y: {
-                            beginAtZero: Boolean(chartOptions.beginAtZero),
-                            title: { display: !!chartOptions.yTitle, text: chartOptions.yTitle || '' },
-                        },
-                    },
-                },
-            };
-            if (chartOptions.secondaryAxis) {
-                config.options.scales.y1 = {
-                    position: 'right',
-                    min: chartOptions.secondaryAxis.min ?? 0,
-                    max: chartOptions.secondaryAxis.max ?? 1,
-                    grid: { drawOnChartArea: false },
-                    title: { display: true, text: chartOptions.secondaryAxis.title || '' },
-                };
-            }
-            charts.push(new Chart(el, config));
-        }
-
-        createLineChart('chart-current-left', dashboard.current_day.left_temp, { yTitle: '°C' });
-        createLineChart('chart-current-right', dashboard.current_day.right_temp, { yTitle: '°C' });
-        createLineChart('chart-current-hum', dashboard.current_day.humidity, { yTitle: '%' });
-        createLineChart('chart-current-flow', dashboard.current_day.flow, { yTitle: 'L/min', fill: true, beginAtZero: true });
-        createLineChart('chart-current-relays', dashboard.current_day.relays, { yTitle: 'Estado', beginAtZero: true });
-
-        createLineChart('chart-history-temp', dashboard.history_3d.temperature, { yTitle: '°C' });
-        createLineChart('chart-history-hum', dashboard.history_3d.humidity, { yTitle: '%' });
-        createLineChart('chart-history-flow', dashboard.history_3d.flow, { yTitle: 'L/min', fill: true, beginAtZero: true });
-        createLineChart('chart-history-relays', dashboard.history_3d.relays, { yTitle: 'Estado', beginAtZero: true });
-
-        createLineChart('chart-energy', dashboard.energy_balance.power, {
-            yTitle: 'Potência térmica [kW]',
-            beginAtZero: true,
-            secondaryAxis: { title: 'Bomba R2', min: 0, max: 1 },
-            secondarySeries: ['R2'],
-        });
+        const csvUrl = new URL(`/execucao/${executionId}/export/csv/`, window.location.origin);
+        if (start) csvUrl.searchParams.set('start', start);
+        if (end) csvUrl.searchParams.set('end', end);
+        document.getElementById('btnExportCsv').href = csvUrl.toString();
+        document.getElementById('btnExportJson').href = url.toString();
     }
+
+    async function loadRealtime() {
+        const status = document.getElementById('tempoRealStatus');
+        if (status) status.textContent = 'Atualizando...';
+        const res = await fetch(`/api/tempo-real/`);
+        const data = await res.json();
+        if (data.empty) {
+            if (status) status.textContent = data.message || 'Sem dados para o dia atual.';
+            return;
+        }
+        renderRealtime(data.dashboard || {});
+        if (status) status.textContent = `Última atualização: ${data.captured_at || '-'}`;
+    }
+
+    document.getElementById('btnAplicarHistorico').addEventListener('click', loadHistorical);
+    document.getElementById('btnLimparHistorico').addEventListener('click', () => {
+        document.getElementById('historicoStart').value = '';
+        document.getElementById('historicoEnd').value = '';
+        document.getElementById('historicoFreq').value = '5min';
+        loadHistorical();
+    });
+    document.getElementById('btnAtualizarTempoReal').addEventListener('click', loadRealtime);
+
+    renderHistorical({
+        meta: {
+            janela: 'Últimos 3 dias do payload salvo',
+            n_registros: 0,
+            freq: '5min'
+        },
+        charts: {
+            temperature: (initialDashboard.history_3d || {}).temperature || { labels: [], series: {} },
+            humidity: (initialDashboard.history_3d || {}).humidity || { labels: [], series: {} },
+            flow: (initialDashboard.history_3d || {}).flow || { labels: [], series: {} },
+            relays: (initialDashboard.history_3d || {}).relays || { labels: [], series: {} },
+            energy: (initialDashboard.energy_balance || {}).power || { labels: [], series: {} },
+        },
+        preview: [],
+        relay_cards: initialDashboard.relay_cards || [],
+        latest_cards: initialDashboard.latest_cards || {},
+    });
+    renderRealtime(initialDashboard);
+    setActiveTab(initialActiveTab || 'historico');
+
+    loadHistorical();
+    loadRealtime();
+    window.setInterval(loadRealtime, 300000);
+})();
 </script>
 </body>
 </html>

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Any
 import ftplib
 import os
 
 import numpy as np
 import pandas as pd
+from django.core.files.base import ContentFile
 
 from core.models import ProcessingRun
 
@@ -27,8 +28,12 @@ CAUDAL_AIRE_M3H = 750.0
 CURRENT_DAY_FREQ = '1min'
 HISTORY_FREQ = '5min'
 ENERGY_FREQ = '1min'
+ALLOWED_FREQS = {'1min', '5min', '15min', '30min', '1h'}
 
 
+# -------------------------------------------------------------
+# Sanitização
+# -------------------------------------------------------------
 def _safe_float(value: Any) -> Any:
     if pd.isna(value):
         return None
@@ -61,6 +66,9 @@ def _sanitize_dict(data: dict[str, Any]) -> dict[str, Any]:
     return {str(k): _sanitize_value(v) for k, v in data.items()}
 
 
+# -------------------------------------------------------------
+# Cálculos físicos herdados do monitor.py
+# -------------------------------------------------------------
 def calcular_cp_agua(t_celsius: pd.Series | float) -> pd.Series | float:
     return (
         4.2174
@@ -80,6 +88,9 @@ def calcular_rho_aire(t_celsius: pd.Series | float) -> pd.Series | float:
     return 101325.0 / (287.05 * t_kelvin)
 
 
+# -------------------------------------------------------------
+# Aquisição FTP legado
+# -------------------------------------------------------------
 def get_ftp_file(ftp: ftplib.FTP, directory: str, filename_contains: str) -> BytesIO | None:
     try:
         ftp.cwd(directory)
@@ -202,25 +213,19 @@ def _resolve_date_window(params: dict[str, Any]) -> tuple[date, date]:
 
 def buscar_dados_legacy_impl(params: dict[str, Any]) -> pd.DataFrame:
     data_inicio, data_fim = _resolve_date_window(params)
+    dias_total = (data_fim - data_inicio).days + 1
 
-    ftp = ftplib.FTP(
-        FTP_CONFIG['HOST'],
-        FTP_CONFIG['USER'],
-        FTP_CONFIG['PASS'],
-        timeout=FTP_TIMEOUT_SECONDS,
-    )
-
+    ftp = ftplib.FTP(FTP_CONFIG['HOST'], FTP_CONFIG['USER'], FTP_CONFIG['PASS'], timeout=FTP_TIMEOUT_SECONDS)
     try:
         df_lucas_list: list[pd.DataFrame] = []
-        current_day = data_inicio
-        while current_day <= data_fim:
-            fname_lucas = current_day.strftime('%Y_%m_%d') + '_datos.csv'
+        for offset in range(dias_total):
+            target_date = data_inicio + timedelta(days=offset)
+            fname_lucas = target_date.strftime('%Y_%m_%d') + '_datos.csv'
             buff_lucas = get_ftp_file(ftp, FTP_CONFIG['DIR_LUCAS'], fname_lucas)
             if buff_lucas:
                 df_day = process_lucas_data(buff_lucas)
                 if not df_day.empty:
                     df_lucas_list.append(df_day)
-            current_day += timedelta(days=1)
 
         if df_lucas_list:
             df_lucas = pd.concat(df_lucas_list)
@@ -252,9 +257,13 @@ def buscar_dados_legacy_impl(params: dict[str, Any]) -> pd.DataFrame:
     else:
         return pd.DataFrame()
 
+    mask = (df_final.index.date >= data_inicio) & (df_final.index.date <= data_fim)
+    df_final = df_final.loc[mask].copy()
+    if df_final.empty:
+        return pd.DataFrame()
+
     df_final = df_final.infer_objects(copy=False)
     df_final = df_final.resample('1s').asfreq()
-
     numeric_cols = df_final.select_dtypes(include=['number']).columns
     if len(numeric_cols) > 0:
         df_final[numeric_cols] = df_final[numeric_cols].interpolate(method='time')
@@ -296,30 +305,71 @@ def buscar_dados_legacy_impl(params: dict[str, Any]) -> pd.DataFrame:
     return df_final
 
 
+# -------------------------------------------------------------
+# Persistência / leitura do dataset salvo na execução
+# -------------------------------------------------------------
+def _serialize_dataframe_csv(df: pd.DataFrame) -> bytes:
+    out = StringIO()
+    serial = df.reset_index().rename(columns={df.index.name or 'index': 'timestamp'})
+    serial.to_csv(out, index=False)
+    return out.getvalue().encode('utf-8')
+
+
+def salvar_dataframe_execucao(execucao: ProcessingRun, df: pd.DataFrame) -> None:
+    filename = f"execucao_{execucao.pk}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    content = ContentFile(_serialize_dataframe_csv(df))
+    if execucao.arquivo:
+        try:
+            execucao.arquivo.delete(save=False)
+        except Exception:
+            pass
+    execucao.arquivo.save(filename, content, save=False)
+
+
+def carregar_execucao_dataframe(execucao: ProcessingRun) -> pd.DataFrame:
+    if execucao.arquivo:
+        execucao.arquivo.open('rb')
+        try:
+            df = pd.read_csv(execucao.arquivo)
+        finally:
+            execucao.arquivo.close()
+        if 'timestamp' not in df.columns:
+            raise ValueError('O CSV salvo na execução não possui a coluna timestamp.')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        df = df.dropna(subset=['timestamp']).set_index('timestamp').sort_index()
+        for col in df.columns:
+            if df[col].dtype == object:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                except Exception:
+                    pass
+        return df
+
+    return buscar_dados_legacy_impl(execucao.parametros_busca or {})
+
+
+# -------------------------------------------------------------
+# Helpers de gráfico / filtro
+# -------------------------------------------------------------
 def _resample_numeric(df: pd.DataFrame, columns: list[str], freq: str) -> pd.DataFrame:
     cols = [c for c in columns if c in df.columns]
     if not cols or df.empty:
         return pd.DataFrame(index=df.index[:0])
     out = df[cols].resample(freq).mean()
-    out = out.interpolate(method='time', limit_direction='both')
-    return out
+    return out.interpolate(method='time', limit_direction='both')
 
 
 def _resample_step(df: pd.DataFrame, columns: list[str], freq: str) -> pd.DataFrame:
     cols = [c for c in columns if c in df.columns]
     if not cols or df.empty:
         return pd.DataFrame(index=df.index[:0])
-    out = df[cols].ffill().resample(freq).max().fillna(0)
-    return out
+    return df[cols].ffill().resample(freq).max().fillna(0)
 
 
 def _chart_payload(df: pd.DataFrame, label_fmt: str, series_names: dict[str, str] | None = None) -> dict[str, Any]:
     if df.empty:
         return {'labels': [], 'series': {}}
-    payload = {
-        'labels': [ts.strftime(label_fmt) for ts in df.index],
-        'series': {},
-    }
+    payload = {'labels': [ts.strftime(label_fmt) for ts in df.index], 'series': {}}
     for col in df.columns:
         key = series_names.get(col, col) if series_names else col
         payload['series'][key] = [None if pd.isna(v) else float(v) for v in df[col].tolist()]
@@ -361,6 +411,56 @@ def _latest_value(df: pd.DataFrame, col: str) -> Any:
     return _sanitize_value(valid.iloc[-1])
 
 
+def _normalize_freq(freq: str | None, default: str = HISTORY_FREQ) -> str:
+    if not freq:
+        return default
+    freq = freq.strip().lower()
+    if freq not in ALLOWED_FREQS:
+        return default
+    return freq
+
+
+def _parse_dt(value: str | None) -> pd.Timestamp | None:
+    if not value:
+        return None
+    try:
+        ts = pd.to_datetime(value)
+        if pd.isna(ts):
+            return None
+        return ts
+    except Exception:
+        return None
+
+
+def filtrar_dataframe(df: pd.DataFrame, start: str | None = None, end: str | None = None) -> pd.DataFrame:
+    if df.empty:
+        return df
+    start_ts = _parse_dt(start)
+    end_ts = _parse_dt(end)
+    out = df.copy()
+    if start_ts is not None:
+        out = out[out.index >= start_ts]
+    if end_ts is not None:
+        out = out[out.index <= end_ts]
+    return out
+
+
+def _build_relay_cards(df: pd.DataFrame) -> list[dict[str, Any]]:
+    relay_cards: list[dict[str, Any]] = []
+    relay_labels = {'R1': 'R1', 'R2': 'Bomba (R2)', 'R3': 'Ventilador (R3)', 'R4': 'R4'}
+    for col in ['R1', 'R2', 'R3', 'R4']:
+        if col in df.columns:
+            latest = _latest_value(df, col)
+            state = 1 if (latest or 0) > 0.5 else 0
+            relay_cards.append({
+                'name': relay_labels[col],
+                'state': 'ON' if state else 'OFF',
+                'duration': _relay_duration_text(df, col),
+                'value': latest,
+            })
+    return relay_cards
+
+
 def construir_dashboard(df: pd.DataFrame) -> dict[str, Any]:
     if df.empty:
         return {}
@@ -395,7 +495,7 @@ def construir_dashboard(df: pd.DataFrame) -> dict[str, Any]:
     if not energy_numeric.empty:
         energy_numeric = energy_numeric.clip(lower=0)
     energy_relays = _resample_step(energy_source, ['R2'], ENERGY_FREQ)
-    if not energy_relays.empty:
+    if not energy_relays.empty and not energy_numeric.empty:
         energy_numeric['R2'] = energy_relays['R2']
 
     latest_cards = {
@@ -415,22 +515,11 @@ def construir_dashboard(df: pd.DataFrame) -> dict[str, Any]:
         'Q_AERO_A': _latest_value(df_today, 'Q_AERO_A'),
     }
 
-    relay_cards = []
-    relay_labels = {'R1': 'R1', 'R2': 'Bomba (R2)', 'R3': 'Ventilador (R3)', 'R4': 'R4'}
-    for col in ['R1', 'R2', 'R3', 'R4']:
-        if col in df_today.columns:
-            state = 1 if (_latest_value(df_today, col) or 0) > 0.5 else 0
-            relay_cards.append({
-                'name': relay_labels[col],
-                'state': 'ON' if state else 'OFF',
-                'duration': _relay_duration_text(df_today, col),
-            })
-
     energia_total = 0.0
     if 'Energia_Colector_kWh' in df_today.columns:
         energia_total = float(df_today['Energia_Colector_kWh'].fillna(0).sum())
 
-    dashboard = {
+    return {
         'kpis': {
             'ultima_atualizacao': _sanitize_value(end_ts),
             'energia_colector_kwh_hoje': round(energia_total, 4),
@@ -438,7 +527,7 @@ def construir_dashboard(df: pd.DataFrame) -> dict[str, Any]:
             'caudal_max_hoje': _sanitize_value(df_today['Caudal'].max()) if 'Caudal' in df_today.columns and df_today['Caudal'].notna().any() else None,
         },
         'latest_cards': latest_cards,
-        'relay_cards': relay_cards,
+        'relay_cards': _build_relay_cards(df_today),
         'current_day': {
             'left_temp': _chart_payload(current_left, '%H:%M', {'T1_LUCAS': 'T1'}),
             'right_temp': _chart_payload(current_right, '%H:%M'),
@@ -457,7 +546,73 @@ def construir_dashboard(df: pd.DataFrame) -> dict[str, Any]:
             'energia_colector_kwh_hoje': round(energia_total, 4),
         },
     }
-    return dashboard
+
+
+def construir_historico_filtrado(df: pd.DataFrame, freq: str = HISTORY_FREQ, start: str | None = None, end: str | None = None) -> dict[str, Any]:
+    df_filtered = filtrar_dataframe(df, start=start, end=end)
+    freq = _normalize_freq(freq)
+    if df_filtered.empty:
+        return {
+            'meta': {
+                'start': start,
+                'end': end,
+                'freq': freq,
+                'n_registros': 0,
+                'janela': None,
+            },
+            'charts': {
+                'temperature': {'labels': [], 'series': {}},
+                'humidity': {'labels': [], 'series': {}},
+                'flow': {'labels': [], 'series': {}},
+                'relays': {'labels': [], 'series': {}},
+                'energy': {'labels': [], 'series': {}},
+            },
+            'preview': [],
+            'relay_cards': [],
+            'latest_cards': {},
+        }
+
+    temp = _resample_numeric(df_filtered, ['T1_LUCAS', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'], freq)
+    hum = _resample_numeric(df_filtered, ['Humedad_S1', 'Humedad_S2'], freq)
+    flow = _resample_numeric(df_filtered, ['Caudal'], freq)
+    relays = _resample_step(df_filtered, ['R1', 'R2', 'R3', 'R4'], freq)
+    energy_cols = [c for c in ['Q_COLECTOR', 'Q_T1_T5', 'Q_AERO_W', 'Q_AERO_A'] if c in df_filtered.columns]
+    energy = _resample_numeric(df_filtered, energy_cols, freq)
+    if not energy.empty:
+        energy = energy.clip(lower=0)
+
+    return {
+        'meta': {
+            'start': _sanitize_value(df_filtered.index.min()),
+            'end': _sanitize_value(df_filtered.index.max()),
+            'freq': freq,
+            'n_registros': int(df_filtered.shape[0]),
+            'janela': f"{_sanitize_value(df_filtered.index.min())} até {_sanitize_value(df_filtered.index.max())}",
+        },
+        'charts': {
+            'temperature': _chart_payload(temp, '%d/%m %H:%M', {'T1_LUCAS': 'T1'}),
+            'humidity': _chart_payload(hum, '%d/%m %H:%M', {'Humedad_S1': 'H1', 'Humedad_S2': 'H2'}),
+            'flow': _chart_payload(flow, '%d/%m %H:%M'),
+            'relays': _chart_payload(relays, '%d/%m %H:%M'),
+            'energy': _chart_payload(energy, '%d/%m %H:%M'),
+        },
+        'preview': _sanitize_records(
+            df_filtered.reset_index().rename(columns={df_filtered.index.name or 'index': 'timestamp'}).tail(60).to_dict(orient='records')
+        ),
+        'relay_cards': _build_relay_cards(df_filtered),
+        'latest_cards': {
+            'T1': _latest_value(df_filtered, 'T1_LUCAS'),
+            'T2': _latest_value(df_filtered, 'T2'),
+            'T3': _latest_value(df_filtered, 'T3'),
+            'T4': _latest_value(df_filtered, 'T4'),
+            'T5': _latest_value(df_filtered, 'T5'),
+            'T6': _latest_value(df_filtered, 'T6'),
+            'T7': _latest_value(df_filtered, 'T7'),
+            'T8': _latest_value(df_filtered, 'T8'),
+            'Caudal': _latest_value(df_filtered, 'Caudal'),
+            'GHI': _latest_value(df_filtered, 'GHI'),
+        },
+    }
 
 
 def construir_resumo(df: pd.DataFrame) -> dict[str, Any]:
@@ -468,7 +623,7 @@ def construir_resumo(df: pd.DataFrame) -> dict[str, Any]:
         'nulos_por_coluna': {str(k): int(v) for k, v in df.isna().sum().to_dict().items()},
         'tipos': {str(k): str(v) for k, v in df.dtypes.astype(str).to_dict().items()},
         'preview': _sanitize_records(
-            df.reset_index().rename(columns={'index': 'timestamp'}).head(MAX_PREVIEW_ROWS).to_dict(orient='records')
+            df.reset_index().rename(columns={df.index.name or 'index': 'timestamp'}).head(MAX_PREVIEW_ROWS).to_dict(orient='records')
         ),
         'ultima_timestamp': _sanitize_value(df.index.max()) if not df.empty else None,
         'primeira_timestamp': _sanitize_value(df.index.min()) if not df.empty else None,
@@ -504,6 +659,20 @@ def construir_resumo(df: pd.DataFrame) -> dict[str, Any]:
     return resumo
 
 
+def obter_payload_tempo_real() -> dict[str, Any]:
+    today = datetime.now().date()
+    df = buscar_dados_legacy_impl({'data_inicio': today.isoformat(), 'data_fim': today.isoformat()})
+    if df.empty:
+        return {'empty': True, 'message': 'Nenhum dado disponível para o dia atual.'}
+    dashboard = construir_dashboard(df)
+    return {
+        'empty': False,
+        'auto_refresh_seconds': 300,
+        'captured_at': _sanitize_value(datetime.now()),
+        'dashboard': dashboard,
+    }
+
+
 def processar_execucao_servidor(execucao: ProcessingRun) -> ProcessingRun:
     try:
         df = buscar_dados_legacy_impl(execucao.parametros_busca or {})
@@ -511,6 +680,7 @@ def processar_execucao_servidor(execucao: ProcessingRun) -> ProcessingRun:
             raise ValueError('Nenhum dado foi encontrado no FTP legado para a janela solicitada.')
 
         resumo = construir_resumo(df)
+        salvar_dataframe_execucao(execucao, df)
 
         execucao.status = ProcessingRun.Status.SUCCESS
         execucao.total_linhas = resumo['n_linhas']
@@ -526,6 +696,7 @@ def processar_execucao_servidor(execucao: ProcessingRun) -> ProcessingRun:
                 'colunas',
                 'resumo',
                 'erro',
+                'arquivo',
                 'atualizado_em',
             ]
         )
