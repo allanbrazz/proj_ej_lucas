@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Solar - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f9;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 1520px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .header { margin-bottom: 24px; }
+        .header h1 { margin: 0 0 8px 0; }
+        .header p { margin: 0; color: #6b7280; }
+        .layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        .card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.06);
+            margin-bottom: 24px;
+        }
+        .field { margin-bottom: 14px; }
+        .field label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .field input { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+        .btn {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-success { background: #059669; color: #fff; }
+        .btn-secondary { background: #e5e7eb; color: #111827; }
+        .history-list { list-style: none; padding: 0; margin: 0; }
+        .history-list li { border-bottom: 1px solid #e5e7eb; padding: 12px 0; }
+        .history-list li:last-child { border-bottom: none; }
+        .history-list a { text-decoration: none; color: #2563eb; font-weight: 700; }
+        .muted { color: #6b7280; }
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-error { background: #fee2e2; color: #991b1b; }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(150px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .info-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .info-box .label { display:block; font-size:12px; color:#6b7280; margin-bottom:6px; text-transform: uppercase; }
+        .info-box .value { font-weight: 700; font-size: 18px; word-break: break-word; }
+        .dashboard-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: 12px;
+            margin: 16px 0 24px;
+        }
+        .kpi-card {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 14px;
+        }
+        .kpi-card .title { font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 6px; }
+        .kpi-card .number { font-size: 24px; font-weight: 700; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px; }
+        .tab-btn {
+            background: #e5e7eb;
+            color: #111827;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .tab-btn.active { background: #2563eb; color: #fff; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .chart-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 16px; }
+        .chart-grid-1 { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        .chart-card {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            padding: 16px;
+            min-height: 320px;
+        }
+        .chart-card h3 { margin: 0 0 10px; font-size: 16px; }
+        .chart-wrap { position: relative; height: 250px; }
+        .chart-wrap.tall { height: 300px; }
+        .relay-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .relay-card {
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+        .relay-card.on { background: #dcfce7; border-color: #86efac; }
+        .relay-card.off { background: #fee2e2; border-color: #fca5a5; }
+        .relay-card .name { font-size: 12px; color: #374151; text-transform: uppercase; }
+        .relay-card .state { font-weight: 700; font-size: 20px; margin: 6px 0; }
+        .relay-card .time { color: #6b7280; font-size: 13px; }
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        pre {
+            background: #111827;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 12px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        details summary { cursor: pointer; font-weight: 700; margin-bottom: 10px; }
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 12px;
+        }
+        @media (max-width: 1100px) {
+            .layout, .chart-grid-2, .info-grid, .dashboard-kpis, .relay-grid, .details-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Monitor Solar - Dashboard legado em Django</h1>
+        <p>Os dados vêm do FTP legado e agora são apresentados em um painel web com os gráficos do monitor diário, histórico de 3 dias e balanço energético.</p>
+    </div>
+
+    <div class="layout">
+        <div>
+            <div class="card">
+                <h2>Nova sincronização</h2>
+                <form method="post" action="{% url 'sincronizar_servidor' %}">
+                    {% csrf_token %}
+                    <div class="field">
+                        <label for="{{ form.nome.id_for_label }}">Nome da execução</label>
+                        {{ form.nome }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.filtro.id_for_label }}">Filtro</label>
+                        {{ form.filtro }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.data_inicio.id_for_label }}">Data início</label>
+                        {{ form.data_inicio }}
+                    </div>
+                    <div class="field">
+                        <label for="{{ form.data_fim.id_for_label }}">Data fim</label>
+                        {{ form.data_fim }}
+                    </div>
+                    {% if form.non_field_errors %}
+                        <div class="error-box">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="actions">
+                        <button type="submit" class="btn btn-primary">Sincronizar FTP legado</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>Últimas execuções</h2>
+                {% if ultimas_execucoes %}
+                    <ul class="history-list">
+                        {% for item in ultimas_execucoes %}
+                            <li>
+                                <a href="{% url 'execucao_detalhe' item.pk %}">{{ item.nome }}</a>
+                                {% if item.status == 'pending' %}
+                                    <span class="badge badge-pending">Pendente</span>
+                                {% elif item.status == 'success' %}
+                                    <span class="badge badge-success">Sucesso</span>
+                                {% else %}
+                                    <span class="badge badge-error">Erro</span>
+                                {% endif %}
+                                <div class="muted">{{ item.criado_em|date:"d/m/Y H:i:s" }} | {{ item.origem }}</div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="muted">Nenhuma execução cadastrada.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2>Execução selecionada</h2>
+                {% if execucao_selecionada %}
+                    <div class="actions">
+                        <form method="post" action="{% url 'sincronizar_novamente' execucao_selecionada.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success">Refresh</button>
+                        </form>
+                        <a class="btn btn-secondary" href="{% url 'execucao_api' execucao_selecionada.pk %}" target="_blank">Ver JSON</a>
+                    </div>
+
+                    <div class="info-grid">
+                        <div class="info-box"><span class="label">ID</span><span class="value">{{ execucao_selecionada.pk }}</span></div>
+                        <div class="info-box"><span class="label">Status</span><span class="value">{{ execucao_selecionada.get_status_display }}</span></div>
+                        <div class="info-box"><span class="label">Origem</span><span class="value">{{ execucao_selecionada.origem }}</span></div>
+                        <div class="info-box"><span class="label">Linhas</span><span class="value">{{ execucao_selecionada.total_linhas }}</span></div>
+                        <div class="info-box"><span class="label">Colunas</span><span class="value">{{ execucao_selecionada.total_colunas }}</span></div>
+                        <div class="info-box"><span class="label">Criado em</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.criado_em|date:"d/m/Y H:i:s" }}</span></div>
+                        <div class="info-box"><span class="label">Atualizado em</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.atualizado_em|date:"d/m/Y H:i:s" }}</span></div>
+                        <div class="info-box"><span class="label">Última janela</span><span class="value" style="font-size:14px;">{{ execucao_selecionada.resumo.janela_temporal.inicio|default:"-" }}</span></div>
+                    </div>
+
+                    {% if execucao_selecionada.erro %}
+                        <div class="error-box">{{ execucao_selecionada.erro }}</div>
+                    {% endif %}
+
+                    {% if dashboard_data %}
+                        <div class="dashboard-kpis">
+                            <div class="kpi-card">
+                                <div class="title">Energia útil hoje</div>
+                                <div class="number">{{ dashboard_data.kpis.energia_colector_kwh_hoje|default:0 }}</div>
+                                <div class="muted">kWh</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="title">GHI máximo hoje</div>
+                                <div class="number">{{ dashboard_data.kpis.ghi_max_hoje|default:"-" }}</div>
+                                <div class="muted">W/m²</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="title">Caudal máximo</div>
+                                <div class="number">{{ dashboard_data.kpis.caudal_max_hoje|default:"-" }}</div>
+                                <div class="muted">L/min</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="title">Última atualização</div>
+                                <div class="number" style="font-size:16px;">{{ dashboard_data.kpis.ultima_atualizacao|default:"-" }}</div>
+                                <div class="muted">timestamp</div>
+                            </div>
+                        </div>
+
+                        <div class="relay-grid">
+                            {% for relay in dashboard_data.relay_cards %}
+                                <div class="relay-card {% if relay.state == 'ON' %}on{% else %}off{% endif %}">
+                                    <div class="name">{{ relay.name }}</div>
+                                    <div class="state">{{ relay.state }}</div>
+                                    <div class="time">Tempo: {{ relay.duration }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="tabs">
+                            <button class="tab-btn active" data-tab="tab-monitor">Monitor do dia</button>
+                            <button class="tab-btn" data-tab="tab-historico">Histórico 3 dias</button>
+                            <button class="tab-btn" data-tab="tab-energia">Balanço energético</button>
+                        </div>
+
+                        <div id="tab-monitor" class="tab-panel active">
+                            <div class="chart-grid-2">
+                                <div class="chart-card"><h3>Temperaturas (T1, T2, T3, T6)</h3><div class="chart-wrap"><canvas id="chart-current-left"></canvas></div></div>
+                                <div class="chart-card"><h3>Temperaturas (T4, T5, T7, T8)</h3><div class="chart-wrap"><canvas id="chart-current-right"></canvas></div></div>
+                                <div class="chart-card"><h3>Humedad</h3><div class="chart-wrap"><canvas id="chart-current-hum"></canvas></div></div>
+                                <div class="chart-card"><h3>Caudal</h3><div class="chart-wrap"><canvas id="chart-current-flow"></canvas></div></div>
+                                <div class="chart-card" style="grid-column: 1 / -1;"><h3>Actuadores</h3><div class="chart-wrap"><canvas id="chart-current-relays"></canvas></div></div>
+                            </div>
+                        </div>
+
+                        <div id="tab-historico" class="tab-panel">
+                            <div class="chart-grid-1">
+                                <div class="chart-card"><h3>Temperaturas - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-temp"></canvas></div></div>
+                                <div class="chart-card"><h3>Humedad - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-hum"></canvas></div></div>
+                                <div class="chart-card"><h3>Caudal - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-flow"></canvas></div></div>
+                                <div class="chart-card"><h3>Actuadores - 3 dias</h3><div class="chart-wrap"><canvas id="chart-history-relays"></canvas></div></div>
+                            </div>
+                        </div>
+
+                        <div id="tab-energia" class="tab-panel">
+                            <div class="chart-grid-1">
+                                <div class="chart-card">
+                                    <h3>Potências térmicas</h3>
+                                    <div class="chart-wrap tall"><canvas id="chart-energy"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="muted">Esta execução ainda não possui payload de dashboard.</p>
+                    {% endif %}
+
+                    <div class="details-grid" style="margin-top:24px;">
+                        <div>
+                            <details>
+                                <summary>Parâmetros da execução</summary>
+                                <pre>{{ execucao_selecionada.parametros_busca }}</pre>
+                            </details>
+                        </div>
+                        <div>
+                            <details>
+                                <summary>Colunas identificadas</summary>
+                                <pre>{{ execucao_selecionada.colunas }}</pre>
+                            </details>
+                        </div>
+                    </div>
+
+                    <details style="margin-top:16px;">
+                        <summary>Resumo bruto</summary>
+                        <pre>{{ execucao_selecionada.resumo }}</pre>
+                    </details>
+                {% else %}
+                    <p class="muted">Nenhuma execução disponível.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if dashboard_data %}
+    {{ dashboard_data|json_script:"dashboard-data" }}
+{% endif %}
+
+<script>
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach((item) => item.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    const dashboardScript = document.getElementById('dashboard-data');
+    if (dashboardScript) {
+        const dashboard = JSON.parse(dashboardScript.textContent);
+        const charts = [];
+
+        const COLORS = {
+            T1: '#FF0000', T2: '#FFD700', T3: '#FF8C00', T4: '#DC143C', T5: '#00008B', T6: '#2E8B57', T7: '#FF8C00', T8: '#8A2BE2',
+            H1: '#9400D3', H2: '#DA70D6', Caudal: '#2E7D32', GHI: '#D4AF37',
+            R1: '#FF00FF', R2: '#32CD32', R3: '#D2691E', R4: '#008080',
+            Q_COLECTOR: '#FF4500', Q_T1_T5: '#FF1493', Q_AERO_W: '#1E90FF', Q_AERO_A: '#32CD32'
+        };
+
+        function datasetColor(name) {
+            return COLORS[name] || '#4B5563';
+        }
+
+        function buildDatasets(seriesMap, options = {}) {
+            return Object.entries(seriesMap || {}).map(([name, values]) => {
+                const isRelay = name.startsWith('R');
+                const isFlow = name === 'Caudal';
+                const isPower = ['Q_COLECTOR', 'Q_T1_T5', 'Q_AERO_W', 'Q_AERO_A'].includes(name);
+                return {
+                    label: name,
+                    data: values,
+                    borderColor: datasetColor(name),
+                    backgroundColor: options.fill || isFlow ? datasetColor(name) + '33' : datasetColor(name),
+                    fill: Boolean(options.fill || isFlow),
+                    tension: isRelay ? 0 : 0.2,
+                    stepped: isRelay,
+                    pointRadius: 0,
+                    borderWidth: isPower ? 2 : 1.4,
+                    yAxisID: (options.secondarySeries || []).includes(name) ? 'y1' : 'y',
+                };
+            });
+        }
+
+        function createLineChart(canvasId, payload, chartOptions = {}) {
+            const el = document.getElementById(canvasId);
+            if (!el || !payload || !payload.labels || !payload.labels.length) return;
+            const config = {
+                type: 'line',
+                data: {
+                    labels: payload.labels,
+                    datasets: buildDatasets(payload.series, chartOptions),
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: {
+                            beginAtZero: Boolean(chartOptions.beginAtZero),
+                            title: { display: !!chartOptions.yTitle, text: chartOptions.yTitle || '' },
+                        },
+                    },
+                },
+            };
+            if (chartOptions.secondaryAxis) {
+                config.options.scales.y1 = {
+                    position: 'right',
+                    min: chartOptions.secondaryAxis.min ?? 0,
+                    max: chartOptions.secondaryAxis.max ?? 1,
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: chartOptions.secondaryAxis.title || '' },
+                };
+            }
+            charts.push(new Chart(el, config));
+        }
+
+        createLineChart('chart-current-left', dashboard.current_day.left_temp, { yTitle: '°C' });
+        createLineChart('chart-current-right', dashboard.current_day.right_temp, { yTitle: '°C' });
+        createLineChart('chart-current-hum', dashboard.current_day.humidity, { yTitle: '%' });
+        createLineChart('chart-current-flow', dashboard.current_day.flow, { yTitle: 'L/min', fill: true, beginAtZero: true });
+        createLineChart('chart-current-relays', dashboard.current_day.relays, { yTitle: 'Estado', beginAtZero: true });
+
+        createLineChart('chart-history-temp', dashboard.history_3d.temperature, { yTitle: '°C' });
+        createLineChart('chart-history-hum', dashboard.history_3d.humidity, { yTitle: '%' });
+        createLineChart('chart-history-flow', dashboard.history_3d.flow, { yTitle: 'L/min', fill: true, beginAtZero: true });
+        createLineChart('chart-history-relays', dashboard.history_3d.relays, { yTitle: 'Estado', beginAtZero: true });
+
+        createLineChart('chart-energy', dashboard.energy_balance.power, {
+            yTitle: 'Potência térmica [kW]',
+            beginAtZero: true,
+            secondaryAxis: { title: 'Bomba R2', min: 0, max: 1 },
+            secondarySeries: ['R2'],
+        });
+    }
+</script>
+</body>
+</html>
